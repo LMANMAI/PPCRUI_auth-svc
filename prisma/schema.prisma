@@ -8,6 +8,24 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
+model AuthLocalProfile {
+  userId    String      @id
+  orgId     String
+  profile   ProfileType
+  name      String?
+  centerId  String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("authlocalprofile")
+}
+
+enum ProfileType {
+  PATIENT
+  CENTER_ADMIN
+  ORG_ADMIN
+}
+
 model Credential {
   id           String   @id @default(uuid())
   orgId        String
@@ -16,7 +34,12 @@ model Credential {
   passwordHash String
   createdAt    DateTime @default(now())
 
+  profile  ProfileType @default(PATIENT)
+  name     String?
+  centerId String?
+
   @@unique([orgId, email], name: "orgId_email")
+  @@map("credential")
 }
 
 model RefreshToken {
@@ -27,4 +50,6 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@map("refreshtoken")
 }
