@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Credential {
+  id           String   @id @default(uuid())
+  orgId        String
+  userId       String
+  email        String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@unique([orgId, email], name: "orgId_email")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  jti       String   @unique
+  hash      String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
