@@ -42,6 +42,8 @@ export class AuthService {
       profile,
       centerId,
       roles,
+      phone: user.phone ?? null,
+      usuarioVerificado: !!user.usuarioVerificado,
       jti: randomUUID(),
     };
   }
@@ -85,11 +87,20 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.credential.findUnique({
-      where: { orgId_email: { orgId: dto.orgId, email: dto.email } } as any,
-    });
+    const email = dto.email.trim().toLowerCase();
+    const document = (dto as any).document?.trim?.() ?? '';
+    const phone = (dto as any).phone ?? null;
 
-    if (existing) {
+    const [byEmail, byDoc] = await this.prisma.$transaction([
+      this.prisma.credential.findUnique({
+        where: { orgId_email: { orgId: dto.orgId, email } } as any,
+      }),
+      this.prisma.credential.findUnique({
+        where: { orgId_dni: { orgId: dto.orgId, dni: document } } as any,
+      }),
+    ]);
+
+    if (byEmail) {
       return {
         ok: false,
         status: 'ALREADY_REGISTERED',
@@ -100,11 +111,22 @@ export class AuthService {
         },
       };
     }
+    if (byDoc) {
+      return {
+        ok: false,
+        status: 'ALREADY_REGISTERED',
+        error: {
+          code: 'DNI_EXISTS',
+          message:
+            'Ya existe una cuenta registrada con ese documento para esta organización.',
+        },
+      };
+    }
 
     const created = {
       id: randomUUID(),
       orgId: dto.orgId,
-      email: dto.email,
+      email,
       patient:
         dto.profileType === 'PATIENT' ? { fullName: dto.fullName ?? '' } : null,
       staff:
@@ -120,6 +142,8 @@ export class AuthService {
           : dto.profileType === 'CENTER_ADMIN'
             ? [{ role: { key: 'CENTER_ADMIN' } }]
             : [],
+      phone,
+      usuarioVerificado: false,
     };
 
     const hash = bcrypt.hashSync(dto.password, 10);
@@ -128,6 +152,9 @@ export class AuthService {
         orgId: created.orgId,
         userId: created.id,
         email: created.email,
+        dni: document,
+        telefono: phone,
+        usuarioVerificado: false,
         passwordHash: hash,
         profile: dto.profileType as any,
         name: dto.staffFullName ?? dto.fullName ?? null,
@@ -153,9 +180,30 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const cred = await this.prisma.credential.findUnique({
-      where: { orgId_email: { orgId: dto.orgId, email: dto.email } } as any,
+    const identifier =
+      (dto as any).identifier?.trim?.() ?? (dto as any).email?.trim?.() ?? '';
+
+    if (!identifier) {
+      return {
+        ok: false,
+        status: 'INVALID_LOGIN',
+        error: { code: 'MISSING_IDENTIFIER', message: 'Falta email o DNI.' },
+      };
+    }
+
+    const isEmail = identifier.includes('@');
+    const normalizedEmail = isEmail ? identifier.toLowerCase() : null;
+
+    const cred = await this.prisma.credential.findFirst({
+      where: {
+        orgId: dto.orgId,
+        OR: [
+          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+          { dni: identifier },
+        ],
+      } as any,
     });
+
     if (!cred) {
       return {
         ok: false,
@@ -188,6 +236,9 @@ export class AuthService {
       patient: profile === 'PATIENT' ? { fullName: name } : null,
       staff: profile !== 'PATIENT' ? { fullName: name, centerId } : null,
       roles: rolesFromProfile(profile).map((k) => ({ role: { key: k } })),
+      phone: (cred as any).telefono ?? null,
+
+      usuarioVerificado: !!(cred as any).usuarioVerificado,
     };
 
     const payload = this.buildAccessPayload(user);
@@ -208,7 +259,7 @@ export class AuthService {
   }
 
   async refresh(p: { sub: string; orgId: string }) {
-    const cred = await this.prisma.credential.findUnique({
+    const cred = await this.prisma.credential.findFirst({
       where: { userId: p.sub } as any,
     });
     if (!cred) {
@@ -234,6 +285,8 @@ export class AuthService {
       patient: profile === 'PATIENT' ? { fullName: name } : null,
       staff: profile !== 'PATIENT' ? { fullName: name, centerId } : null,
       roles: rolesFromProfile(profile).map((k) => ({ role: { key: k } })),
+      phone: (cred as any).telefono ?? null,
+      usuarioVerificado: !!(cred as any).usuarioVerificado,
     };
 
     const payload = this.buildAccessPayload(user);

@@ -31,15 +31,13 @@ export class RegisterDto {
   @IsEnum(ProfileType)
   profileType!: ProfileType;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
   fullName?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ description: 'DNI' })
   @IsString()
-  document?: string;
+  document!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -58,15 +56,23 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @ApiProperty({ example: 'user@demo.com' })
-  @IsEmail()
-  email!: string;
+  @ApiProperty({ example: 'org-1' })
+  @IsString()
+  orgId!: string;
+
+  @ApiProperty({
+    description: 'Email o DNI',
+    examples: ['user@demo.com', '34876543'],
+  })
+  @IsString()
+  identifier!: string;
 
   @ApiProperty()
   @IsString()
   password!: string;
 
-  @ApiProperty({ example: 'org-1' })
-  @IsString()
-  orgId!: string;
+  @ApiPropertyOptional({ example: 'user@demo.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 }
