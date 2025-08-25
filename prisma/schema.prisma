@@ -27,18 +27,21 @@ enum ProfileType {
 }
 
 model Credential {
-  id           String   @id @default(uuid())
-  orgId        String
-  userId       String
-  email        String
-  passwordHash String
-  createdAt    DateTime @default(now())
+  id                String   @id @default(uuid())
+  orgId             String
+  userId            String
+  email             String
+  passwordHash      String
+  createdAt         DateTime @default(now())
+  dni               String
+  profile           ProfileType @default(PATIENT)
+  name              String?
+  centerId          String?
+  telefono          String?
+  usuarioVerificado Boolean   @default(false)
 
-  profile  ProfileType @default(PATIENT)
-  name     String?
-  centerId String?
-
-  @@unique([orgId, email], name: "orgId_email")
+  @@unique([orgId, email],    name: "orgId_email")
+  @@unique([orgId, dni],      name: "orgId_dni")
   @@map("credential")
 }
 
