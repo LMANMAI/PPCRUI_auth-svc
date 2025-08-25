@@ -4,5 +4,6 @@ dist
 .prisma
 coverage
 package-lock.json
+
 Dockerfile
 .env.development.docker
