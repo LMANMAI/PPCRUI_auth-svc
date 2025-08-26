@@ -1,20 +1,20 @@
-﻿import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+﻿import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   MinLength,
-} from 'class-validator';
+} from "class-validator";
 
 export enum ProfileType {
-  PATIENT = 'PATIENT',
-  CENTER_ADMIN = 'CENTER_ADMIN',
-  ORG_ADMIN = 'ORG_ADMIN',
+  PATIENT = "PATIENT",
+  CENTER_ADMIN = "CENTER_ADMIN",
+  ORG_ADMIN = "ORG_ADMIN",
 }
 
 export class RegisterDto {
-  @ApiProperty({ example: 'user@demo.com' })
+  @ApiProperty({ example: "user@demo.com" })
   @IsEmail()
   email!: string;
 
@@ -23,7 +23,7 @@ export class RegisterDto {
   @MinLength(6)
   password!: string;
 
-  @ApiProperty({ example: 'org-1' })
+  @ApiProperty({ example: "org-1" })
   @IsString()
   orgId!: string;
 
@@ -35,7 +35,7 @@ export class RegisterDto {
   @IsString()
   fullName?: string;
 
-  @ApiProperty({ description: 'DNI' })
+  @ApiProperty({ description: "DNI" })
   @IsString()
   document!: string;
 
@@ -56,23 +56,11 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @ApiProperty({ example: 'org-1' })
-  @IsString()
-  orgId!: string;
-
-  @ApiProperty({
-    description: 'Email o DNI',
-    examples: ['user@demo.com', '34876543'],
-  })
+  @ApiProperty({ example: "maria.rios@example.com o 34876543" })
   @IsString()
   identifier!: string;
 
   @ApiProperty()
   @IsString()
   password!: string;
-
-  @ApiPropertyOptional({ example: 'user@demo.com' })
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 }
