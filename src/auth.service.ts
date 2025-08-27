@@ -1,15 +1,20 @@
-﻿import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaClient } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
-import * as bcrypt from 'bcryptjs';
+﻿import { Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { PrismaClient } from "@prisma/client";
+import { randomUUID } from "crypto";
+import { RegisterDto, LoginDto } from "./dto/auth.dto";
+import * as bcrypt from "bcryptjs";
 
-function rolesFromProfile(
-  p?: 'PATIENT' | 'CENTER_ADMIN' | 'ORG_ADMIN',
-): string[] {
-  if (p === 'ORG_ADMIN') return ['ORG_ADMIN'];
-  if (p === 'CENTER_ADMIN') return ['CENTER_ADMIN'];
+type ProfileKey =
+  | "PATIENT"
+  | "CENTER_ADMIN"
+  | "ORG_ADMIN"
+  | "OPERADOR_SALUD"
+  | "PERSONAL_SALUD";
+
+function rolesFromProfile(p?: ProfileKey): string[] {
+  if (p === "ORG_ADMIN") return ["ORG_ADMIN"];
+  if (p === "CENTER_ADMIN") return ["CENTER_ADMIN"];
   return [];
 }
 
@@ -17,21 +22,23 @@ function rolesFromProfile(
 export class AuthService {
   constructor(
     private readonly jwt: JwtService,
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaClient
   ) {}
 
   private buildAccessPayload(user: any) {
     const roles: string[] = (user.roles ?? []).map(
-      (r: any) => r?.role?.key ?? r,
+      (r: any) => r?.role?.key ?? r
     );
-    const name = user.patient?.fullName ?? user.staff?.fullName ?? '';
-    const profile = user.patient
-      ? 'PATIENT'
-      : roles.includes('ORG_ADMIN')
-        ? 'ORG_ADMIN'
-        : roles.includes('CENTER_ADMIN')
-          ? 'CENTER_ADMIN'
-          : 'PATIENT';
+    const name = user.patient?.fullName ?? user.staff?.fullName ?? "";
+    const profile: ProfileKey =
+      user.profile ??
+      (user.patient
+        ? "PATIENT"
+        : roles.includes("ORG_ADMIN")
+        ? "ORG_ADMIN"
+        : roles.includes("CENTER_ADMIN")
+        ? "CENTER_ADMIN"
+        : "PATIENT");
     const centerId = user.staff?.centerId ?? null;
 
     return {
@@ -48,14 +55,14 @@ export class AuthService {
     };
   }
 
-  private getAccessTtlSeconds(profile: string): number | null {
+  private getAccessTtlSeconds(profile: ProfileKey): number | null {
     const admin = Number(process.env.ADMIN_ACCESS_TTL_SEC ?? 7200);
     const patient = Number(process.env.PATIENT_ACCESS_TTL_SEC ?? 0);
-    return profile === 'ORG_ADMIN' || profile === 'CENTER_ADMIN'
+    return profile === "ORG_ADMIN" || profile === "CENTER_ADMIN"
       ? admin
       : patient > 0
-        ? patient
-        : null;
+      ? patient
+      : null;
   }
 
   private async signAccess(payload: any) {
@@ -63,7 +70,7 @@ export class AuthService {
     const now = Math.floor(Date.now() / 1000);
     const token = await this.jwt.signAsync(
       payload,
-      ttl ? { expiresIn: ttl } : {},
+      ttl ? { expiresIn: ttl } : {}
     );
     return {
       token,
@@ -76,8 +83,8 @@ export class AuthService {
     const ttl = Number(process.env.REFRESH_TTL_SEC ?? 604800);
     const now = Math.floor(Date.now() / 1000);
     const token = await this.jwt.signAsync(
-      { sub: userId, orgId, typ: 'refresh', jti: randomUUID() },
-      { expiresIn: ttl },
+      { sub: userId, orgId, typ: "refresh", jti: randomUUID() },
+      { expiresIn: ttl }
     );
     return {
       token,
@@ -88,7 +95,7 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
-    const document = (dto as any).document?.trim?.() ?? '';
+    const document = (dto as any).document?.trim?.() ?? "";
     const phone = (dto as any).phone ?? null;
 
     const [byEmail, byDoc] = await this.prisma.$transaction([
@@ -103,22 +110,22 @@ export class AuthService {
     if (byEmail) {
       return {
         ok: false,
-        status: 'ALREADY_REGISTERED',
+        status: "ALREADY_REGISTERED",
         error: {
-          code: 'EMAIL_EXISTS',
+          code: "EMAIL_EXISTS",
           message:
-            'Ya existe una cuenta registrada con ese email para esta organización.',
+            "Ya existe una cuenta registrada con ese email para esta organización.",
         },
       };
     }
     if (byDoc) {
       return {
         ok: false,
-        status: 'ALREADY_REGISTERED',
+        status: "ALREADY_REGISTERED",
         error: {
-          code: 'DNI_EXISTS',
+          code: "DNI_EXISTS",
           message:
-            'Ya existe una cuenta registrada con ese documento para esta organización.',
+            "Ya existe una cuenta registrada con ese documento para esta organización.",
         },
       };
     }
@@ -127,21 +134,19 @@ export class AuthService {
       id: randomUUID(),
       orgId: dto.orgId,
       email,
+      profile: dto.profileType as ProfileKey,
       patient:
-        dto.profileType === 'PATIENT' ? { fullName: dto.fullName ?? '' } : null,
+        dto.profileType === "PATIENT" ? { fullName: dto.fullName ?? "" } : null,
       staff:
-        dto.profileType !== 'PATIENT'
+        dto.profileType !== "PATIENT"
           ? {
-              fullName: dto.staffFullName ?? dto.fullName ?? '',
+              fullName: dto.staffFullName ?? dto.fullName ?? "",
               centerId: dto.centerId ?? null,
             }
           : null,
-      roles:
-        dto.profileType === 'ORG_ADMIN'
-          ? [{ role: { key: 'ORG_ADMIN' } }]
-          : dto.profileType === 'CENTER_ADMIN'
-            ? [{ role: { key: 'CENTER_ADMIN' } }]
-            : [],
+      roles: rolesFromProfile(dto.profileType as ProfileKey).map((k) => ({
+        role: { key: k },
+      })),
       phone,
       usuarioVerificado: false,
     };
@@ -168,7 +173,7 @@ export class AuthService {
 
     return {
       ok: true,
-      status: 'CREATED',
+      status: "CREATED",
       accessToken: access.token,
       accessTokenExpiresIn: access.expiresIn,
       accessTokenExpiresAt: access.expiresAt,
@@ -181,17 +186,17 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const identifier =
-      (dto as any).identifier?.trim?.() ?? (dto as any).email?.trim?.() ?? '';
+      (dto as any).identifier?.trim?.() ?? (dto as any).email?.trim?.() ?? "";
 
     if (!identifier) {
       return {
         ok: false,
-        status: 'INVALID_LOGIN',
-        error: { code: 'MISSING_IDENTIFIER', message: 'Falta email o DNI.' },
+        status: "INVALID_LOGIN",
+        error: { code: "MISSING_IDENTIFIER", message: "Falta email o DNI." },
       };
     }
 
-    const isEmail = identifier.includes('@');
+    const isEmail = identifier.includes("@");
     const normalizedEmail = isEmail ? identifier.toLowerCase() : null;
 
     const cred = await this.prisma.credential.findFirst({
@@ -207,8 +212,8 @@ export class AuthService {
     if (!cred) {
       return {
         ok: false,
-        status: 'INVALID_LOGIN',
-        error: { code: 'BAD_CREDENTIALS', message: 'Credenciales inválidas' },
+        status: "INVALID_LOGIN",
+        error: { code: "BAD_CREDENTIALS", message: "Credenciales inválidas" },
       };
     }
 
@@ -216,25 +221,22 @@ export class AuthService {
     if (!ok) {
       return {
         ok: false,
-        status: 'INVALID_LOGIN',
-        error: { code: 'BAD_CREDENTIALS', message: 'Credenciales inválidas' },
+        status: "INVALID_LOGIN",
+        error: { code: "BAD_CREDENTIALS", message: "Credenciales inválidas" },
       };
     }
 
-    const profile = (cred as any).profile as
-      | 'PATIENT'
-      | 'CENTER_ADMIN'
-      | 'ORG_ADMIN'
-      | undefined;
-    const name = (cred as any).name ?? '';
+    const profile = (cred as any).profile as ProfileKey;
+    const name = (cred as any).name ?? "";
     const centerId = (cred as any).centerId ?? null;
 
     const user = {
       id: cred.userId,
       orgId: cred.orgId,
       email: cred.email,
-      patient: profile === 'PATIENT' ? { fullName: name } : null,
-      staff: profile !== 'PATIENT' ? { fullName: name, centerId } : null,
+      profile,
+      patient: profile === "PATIENT" ? { fullName: name } : null,
+      staff: profile !== "PATIENT" ? { fullName: name, centerId } : null,
       roles: rolesFromProfile(profile).map((k) => ({ role: { key: k } })),
       phone: (cred as any).telefono ?? null,
 
@@ -247,7 +249,7 @@ export class AuthService {
 
     return {
       ok: true,
-      status: 'LOGGED_IN',
+      status: "LOGGED_IN",
       accessToken: access.token,
       accessTokenExpiresIn: access.expiresIn,
       accessTokenExpiresAt: access.expiresAt,
@@ -265,25 +267,22 @@ export class AuthService {
     if (!cred) {
       return {
         ok: false,
-        status: 'INVALID_REFRESH',
-        error: { code: 'INVALID_SUBJECT', message: 'Token inválido' },
+        status: "INVALID_REFRESH",
+        error: { code: "INVALID_SUBJECT", message: "Token inválido" },
       };
     }
 
-    const profile = (cred as any).profile as
-      | 'PATIENT'
-      | 'CENTER_ADMIN'
-      | 'ORG_ADMIN'
-      | undefined;
-    const name = (cred as any).name ?? '';
+    const profile = (cred as any).profile as ProfileKey;
+    const name = (cred as any).name ?? "";
     const centerId = (cred as any).centerId ?? null;
 
     const user = {
       id: p.sub,
       orgId: p.orgId,
       email: cred.email,
-      patient: profile === 'PATIENT' ? { fullName: name } : null,
-      staff: profile !== 'PATIENT' ? { fullName: name, centerId } : null,
+      profile,
+      patient: profile === "PATIENT" ? { fullName: name } : null,
+      staff: profile !== "PATIENT" ? { fullName: name, centerId } : null,
       roles: rolesFromProfile(profile).map((k) => ({ role: { key: k } })),
       phone: (cred as any).telefono ?? null,
       usuarioVerificado: !!(cred as any).usuarioVerificado,
@@ -293,7 +292,7 @@ export class AuthService {
     const access = await this.signAccess(payload);
     return {
       ok: true,
-      status: 'REFRESHED',
+      status: "REFRESHED",
       accessToken: access.token,
       accessTokenExpiresIn: access.expiresIn,
       accessTokenExpiresAt: access.expiresAt,
