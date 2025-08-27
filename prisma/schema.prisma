@@ -24,6 +24,8 @@ enum ProfileType {
   PATIENT
   CENTER_ADMIN
   ORG_ADMIN
+  OPERADOR_SALUD
+  PERSONAL_SALUD 
 }
 
 model Credential {
