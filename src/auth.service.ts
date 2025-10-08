@@ -43,6 +43,7 @@ export class AuthService {
 
     return {
       sub: user.id,
+      userId: user.id,
       orgId: user.orgId,
       email: user.email,
       name,
@@ -99,12 +100,8 @@ export class AuthService {
     const phone = (dto as any).phone ?? null;
 
     const [byEmail, byDoc] = await this.prisma.$transaction([
-      this.prisma.credential.findUnique({
-        where: { orgId_email: { orgId: dto.orgId, email } } as any,
-      }),
-      this.prisma.credential.findUnique({
-        where: { orgId_dni: { orgId: dto.orgId, dni: document } } as any,
-      }),
+      this.prisma.credential.findUnique({ where: { email } }),
+      this.prisma.credential.findUnique({ where: { dni: document } }),
     ]);
 
     if (byEmail) {
@@ -181,6 +178,7 @@ export class AuthService {
       refreshTokenExpiresIn: refresh.expiresIn,
       refreshTokenExpiresAt: refresh.expiresAt,
       user: payload,
+      userId: created.id,
     };
   }
 
@@ -199,14 +197,8 @@ export class AuthService {
     const isEmail = identifier.includes("@");
     const normalizedEmail = isEmail ? identifier.toLowerCase() : null;
 
-    const cred = await this.prisma.credential.findFirst({
-      where: {
-        orgId: dto.orgId,
-        OR: [
-          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
-          { dni: identifier },
-        ],
-      } as any,
+    const cred = await this.prisma.credential.findUnique({
+      where: isEmail ? { email: normalizedEmail! } : { dni: identifier },
     });
 
     if (!cred) {
@@ -257,6 +249,7 @@ export class AuthService {
       refreshTokenExpiresIn: refresh.expiresIn,
       refreshTokenExpiresAt: refresh.expiresAt,
       user: payload,
+      userId: user.id,
     };
   }
 
@@ -297,6 +290,7 @@ export class AuthService {
       accessTokenExpiresIn: access.expiresIn,
       accessTokenExpiresAt: access.expiresAt,
       user: payload,
+      userId: p.sub,
     };
   }
 }
