@@ -5,9 +5,14 @@ import { randomUUID } from "crypto";
 import { RegisterDto, LoginDto } from "./dto/auth.dto";
 import * as bcrypt from "bcryptjs";
 
-function rolesFromProfile(
-  p?: "PATIENT" | "CENTER_ADMIN" | "ORG_ADMIN"
-): string[] {
+type ProfileKey =
+  | "PATIENT"
+  | "CENTER_ADMIN"
+  | "ORG_ADMIN"
+  | "OPERADOR_SALUD"
+  | "PERSONAL_SALUD";
+
+function rolesFromProfile(p?: ProfileKey): string[] {
   if (p === "ORG_ADMIN") return ["ORG_ADMIN"];
   if (p === "CENTER_ADMIN") return ["CENTER_ADMIN"];
   return [];
@@ -25,13 +30,15 @@ export class AuthService {
       (r: any) => r?.role?.key ?? r
     );
     const name = user.patient?.fullName ?? user.staff?.fullName ?? "";
-    const profile = user.patient
-      ? "PATIENT"
-      : roles.includes("ORG_ADMIN")
-      ? "ORG_ADMIN"
-      : roles.includes("CENTER_ADMIN")
-      ? "CENTER_ADMIN"
-      : "PATIENT";
+    const profile: ProfileKey =
+      user.profile ??
+      (user.patient
+        ? "PATIENT"
+        : roles.includes("ORG_ADMIN")
+        ? "ORG_ADMIN"
+        : roles.includes("CENTER_ADMIN")
+        ? "CENTER_ADMIN"
+        : "PATIENT");
     const centerId = user.staff?.centerId ?? null;
 
     return {
@@ -49,7 +56,7 @@ export class AuthService {
     };
   }
 
-  private getAccessTtlSeconds(profile: string): number | null {
+  private getAccessTtlSeconds(profile: ProfileKey): number | null {
     const admin = Number(process.env.ADMIN_ACCESS_TTL_SEC ?? 7200);
     const patient = Number(process.env.PATIENT_ACCESS_TTL_SEC ?? 0);
     return profile === "ORG_ADMIN" || profile === "CENTER_ADMIN"
@@ -124,6 +131,7 @@ export class AuthService {
       id: randomUUID(),
       orgId: dto.orgId,
       email,
+      profile: dto.profileType as ProfileKey,
       patient:
         dto.profileType === "PATIENT" ? { fullName: dto.fullName ?? "" } : null,
       staff:
@@ -133,12 +141,9 @@ export class AuthService {
               centerId: dto.centerId ?? null,
             }
           : null,
-      roles:
-        dto.profileType === "ORG_ADMIN"
-          ? [{ role: { key: "ORG_ADMIN" } }]
-          : dto.profileType === "CENTER_ADMIN"
-          ? [{ role: { key: "CENTER_ADMIN" } }]
-          : [],
+      roles: rolesFromProfile(dto.profileType as ProfileKey).map((k) => ({
+        role: { key: k },
+      })),
       phone,
       usuarioVerificado: false,
     };
@@ -213,11 +218,7 @@ export class AuthService {
       };
     }
 
-    const profile = (cred as any).profile as
-      | "PATIENT"
-      | "CENTER_ADMIN"
-      | "ORG_ADMIN"
-      | undefined;
+    const profile = (cred as any).profile as ProfileKey;
     const name = (cred as any).name ?? "";
     const centerId = (cred as any).centerId ?? null;
 
@@ -225,6 +226,7 @@ export class AuthService {
       id: cred.userId,
       orgId: cred.orgId,
       email: cred.email,
+      profile,
       patient: profile === "PATIENT" ? { fullName: name } : null,
       staff: profile !== "PATIENT" ? { fullName: name, centerId } : null,
       roles: rolesFromProfile(profile).map((k) => ({ role: { key: k } })),
@@ -263,11 +265,7 @@ export class AuthService {
       };
     }
 
-    const profile = (cred as any).profile as
-      | "PATIENT"
-      | "CENTER_ADMIN"
-      | "ORG_ADMIN"
-      | undefined;
+    const profile = (cred as any).profile as ProfileKey;
     const name = (cred as any).name ?? "";
     const centerId = (cred as any).centerId ?? null;
 
@@ -275,6 +273,7 @@ export class AuthService {
       id: p.sub,
       orgId: p.orgId,
       email: cred.email,
+      profile,
       patient: profile === "PATIENT" ? { fullName: name } : null,
       staff: profile !== "PATIENT" ? { fullName: name, centerId } : null,
       roles: rolesFromProfile(profile).map((k) => ({ role: { key: k } })),

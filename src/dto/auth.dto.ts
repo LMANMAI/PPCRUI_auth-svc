@@ -11,6 +11,9 @@ export enum ProfileType {
   PATIENT = "PATIENT",
   CENTER_ADMIN = "CENTER_ADMIN",
   ORG_ADMIN = "ORG_ADMIN",
+
+  OPERADOR_SALUD = "OPERADOR_SALUD",
+  PERSONAL_SALUD = "PERSONAL_SALUD",
 }
 
 export class RegisterDto {
@@ -56,11 +59,23 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @ApiProperty({ example: "maria.rios@example.com o 34876543" })
+  @ApiProperty({ example: "org-1" })
+  @IsString()
+  orgId!: string;
+
+  @ApiProperty({
+    description: "Email o DNI",
+    examples: ["user@demo.com", "34876543"],
+  })
   @IsString()
   identifier!: string;
 
   @ApiProperty()
   @IsString()
   password!: string;
+
+  @ApiPropertyOptional({ example: "user@demo.com" })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 }
